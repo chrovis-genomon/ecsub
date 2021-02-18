@@ -387,27 +387,41 @@ def _run_task(aws_instance, no, instance_id):
     
     return (exit_code, task_log, system_error)
 
+
 def submit_task_ondemand(aws_instance, no):
-    
     exit_code = 1
     task_log = None
-    
-    if not aws_instance.set_ondemand_price(no):
-        return (exit_code, task_log)
-    
-    for i in range(3):
-        instance_id = aws_instance.run_instances_ondemand (no)
-        if instance_id == None:
-            break
+
+    for i_type in aws_instance.aws_ec2_instance_type_list:
+        aws_instance.task_param[no]['aws_ec2_instance_type'] = i_type
+        for subnet_id in aws_instance.aws_subnet_id or ['']:
+            aws_instance.task_param[no]['aws_subnet_id'] = subnet_id
+            if not aws_instance.set_ondemand_price(no):
+                return exit_code, task_log
+            for i in range(3):
+                try:
+                    instance_id = aws_instance.run_instances_ondemand(no)
+                except ecsub.aws.InsufficientInstanceCapacity as e:
+                    ecsub.tools.warning_message(
+                        aws_instance.cluster_name,
+                        no,
+                        "Couldn't launch a %s instance in %s located in %s. " %
+                        (i_type, subnet_id, e.requested_availability_zone))
+                    break
+
+                if instance_id is None:
+                    return exit_code, task_log
+
+                exit_code, task_log, system_error = \
+                    _run_task(aws_instance, no, instance_id)
+
+                if system_error:
+                    continue
+                else:
+                    return exit_code, task_log
         
-        (exit_code, task_log, system_error) = _run_task(aws_instance, no, instance_id)
-            
-        if system_error:
-            continue
-        else:
-            return (exit_code, task_log)
-        
-    return (exit_code, task_log)
+    return exit_code, task_log
+
 
 def submit_task_spot(aws_instance, no):
 
@@ -631,16 +645,9 @@ def main(params):
             params["aws_ec2_instance_type_list"] = instance_type_list1
         else:
             params["aws_ec2_instance_type_list"] = instance_type_list2
-
-        if len(params["aws_ec2_instance_type_list"]) > 1 and not params["spot"]:
-            print (ecsub.tools.error_message (params["cluster_name"], None, "multiple instance-type option is not support with ondemand-instance mode."))
-            return 1
         
         # "aws-subnet-id": 
         params["aws_subnet_id"] = __split_param(params["aws_subnet_id"])
-        if len(params["aws_subnet_id"]) > 1 and not params["spot"]:
-            print (ecsub.tools.error_message (params["cluster_name"], None, "multiple aws-subnet-id option is not support with ondemand-instance mode."))
-            return 1
 
         # "request_payer_bucket": 
         params["request_payer_bucket"] = __split_param(params["request_payer_bucket"])

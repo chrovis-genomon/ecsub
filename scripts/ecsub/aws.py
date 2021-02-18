@@ -18,6 +18,19 @@ import ecsub.tools
 import glob
 import base64
 import pprint
+import re
+
+
+class AWSError(Exception):
+    pass
+
+
+class InsufficientInstanceCapacity(AWSError):
+    def __init__(self, instance_type, requested_az, recommended_azs):
+        self.instance_type = instance_type
+        self.requested_az = requested_az
+        self.recommended_azs = recommended_azs
+
 
 class Aws_ecsub_control:
 
@@ -100,29 +113,41 @@ class Aws_ecsub_control:
         if type(response) == type(b''):
             return response.decode('ascii')
         return response
-        
-    def _subprocess_call (self, cmd, no = None):
-        def __subprocess_call (cmd):
 
-            proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    def _subprocess_call(self, cmd, no=None):
+        def __subprocess_call(cmd):
+            proc = subprocess.Popen(cmd,
+                                    shell=True,
+                                    stdout=subprocess.PIPE,
+                                    stderr=subprocess.STDOUT)
             while True:
                 line = proc.stdout.readline()
                 if line:
-                    if type(line) == type(b''):
+                    if isinstance(line, type(b'')):
                         line = line.decode('ascii')
                     yield line
-
-                if not line and proc.poll() is not None:
+                elif proc.poll() is not None:
                     break
 
+        task_key_str = None
+        if no is not None:
+            n_colors = len(ecsub.ansi.colors.roll_list)
+            task_key_str = ecsub.ansi.colors.paint(
+                "[%s:%03d]" % (self.cluster_name, no),
+                ecsub.ansi.colors.roll_list[no % n_colors])
+
+        raw_lines = []
         for line in __subprocess_call(cmd):
-            if no != None:
-                line = "%s " % (str(datetime.datetime.now())) + ecsub.ansi.colors.paint("[%s:%03d]" % (self.cluster_name, no), ecsub.ansi.colors.roll_list[no % len(ecsub.ansi.colors.roll_list)]) + line
+            raw_lines.append(line)
+            if task_key_str:
+                date_str = "%s " % (str(datetime.datetime.now()))
+                line = date_str + task_key_str + line
             else:
-                line = ecsub.tools.info_message (self.cluster_name, None, line)
-                
+                line = ecsub.tools.info_message(self.cluster_name, None, line)
+
             if len(line.rstrip()) > 0:
                 sys.stdout.write(line)
+        return raw_lines
 
     def check_awsconfigure(self):
         if ecsub.aws_config.region_to_location(self.aws_region) == None:
@@ -613,7 +638,22 @@ EOF
             userdata = userdata_file,
             log = log_file
         )
-        self._subprocess_call(cmd, no)
+
+        stderr_lines = self._subprocess_call(cmd, no)
+
+        for stderr_line in stderr_lines:
+            if 'InsufficientInstanceCapacity' in stderr_line:
+                req_az = re.findall(
+                    "Availability Zone you requested \\(([^\\)]+)\\)",
+                    stderr_line)
+                azs = re.findall(
+                    "or choosing \\([^.]+\\)\\.",
+                    stderr_line)
+                raise InsufficientInstanceCapacity(
+                    self.task_param[no]['aws_ec2_instance_type'],
+                    req_az[0] if len(req_az) == 1 else None,
+                    azs[0].strip().split(',') if len(azs) == 1 else [])
+
         log = self._json_load(log_file)
         try:
             instance_id = log["Instances"][0]["InstanceId"]
