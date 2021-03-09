@@ -210,7 +210,7 @@ def check_inputfiles(cluster_name, task_params, payer_buckets, job_max = 10):
                     continue
                 
                 bucket = task[i].replace("s3://", "").split("/")[0]
-                key = task[i].replace("s3://", "").replace(bucket, "")
+                key = task[i].replace("s3://", "").replace(bucket, "", 1)
                 if key.startswith("/"):
                     key = key[1:]
                 if key == "":
