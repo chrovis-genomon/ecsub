@@ -863,6 +863,7 @@ class Argments:
         self.aws_log_group_name = ""
         self.aws_key_name = ""
         self.aws_subnet_id = ""
+        self.tags = ""
         self.spot = False
         self.retry_od = False
         self.request_payer_bucket = ""

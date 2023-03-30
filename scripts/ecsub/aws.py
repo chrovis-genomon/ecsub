@@ -85,6 +85,7 @@ class Aws_ecsub_control:
         self.aws_ecs_task_memory_default = 300
         self.disk_size = params["disk_size"]
         self.aws_subnet_id = params["aws_subnet_id"]
+        self.tags = params["tags"]
         self.image = params["image"]
         self.use_amazon_ecr = params["use_amazon_ecr"]
         self.waiter_delay = params["waiter_delay"]
@@ -1182,6 +1183,35 @@ EOF
             open(self._log_path("create-tags.%03d" % (no)), "w")
         )
         
+        # set Tags to instance
+        if inst_info != None:
+            resource_ids = list(map(lambda x: x['Ebs']['VolumeId'], inst_info['BlockDeviceMappings']))
+        else:
+            resource_ids = []
+
+        resource_ids.append(instance_id)
+        tag_list = list(map(lambda x: x.split("="), self.tags.split(",")))
+
+        for tag in tag_list:
+            if len(tag) != 2:
+                continue
+
+            tag_key, tag_value = tag
+
+            cmd_template = "{setx};aws ec2 create-tags --resources {RESOURCE_ID} --tags Key={tagKey},Value={tagValue}"
+            cmd = cmd_template.format(
+                setx = self.setx,
+                RESOURCE_ID = ' '.join(resource_ids),
+                tagKey = tag_key,
+                tagValue = tag_value
+            )
+            self._subprocess_call(cmd, no)
+
+        json.dump(
+            {"InstanceId": instance_id, "Tags": self.tags},
+            open(self._log_path("create-extra-tags.%03d" % (no)), "w")
+        )
+
         if self.flyaway:
             return (0, None)
             
