@@ -147,8 +147,11 @@ def main(params, no):
 def entry_point(wdir, no = None):
     import json
     import glob
-    
-    cluster = json.load(open("%s/log/create-cluster.0.log" % (wdir)))["cluster"]
+
+    cluster = {}
+    with open("%s/log/create-cluster.0.log" % (wdir)) as f:
+        cluster = json.load(f)["cluster"]
+
     instance_list = []
     tags_template = "%s/log/create-tags.*.log" % (wdir)
     if no != None:
@@ -156,8 +159,9 @@ def entry_point(wdir, no = None):
         
     for tag_file in sorted(glob.glob(tags_template)):
         try:
-            instance = json.load(open(tag_file))
-            instance_list.append({"Id": instance["InstanceId"], "Name": instance["InstanceName"]})
+            with open(tag_file) as f:
+                instance = json.load(f)
+                instance_list.append({"Id": instance["InstanceId"], "Name": instance["InstanceName"]})
         except Exception:
             continue
         

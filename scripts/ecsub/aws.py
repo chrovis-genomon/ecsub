@@ -302,8 +302,10 @@ class Aws_ecsub_control:
         if os.path.getsize(json_file) == 0:
             return None
         
+        obj = None
         try:
-            obj = json.load(open(json_file))
+            with open(json_file) as f:
+                obj = json.load(f)
         except Exception:
             #print(ecsub.tools.error_message (self.cluster_name, None, e))
             return None
@@ -498,7 +500,8 @@ class Aws_ecsub_control:
         }
 
         json_file = self._conf_path("task_definition.json")
-        json.dump(containerDefinitions, open(json_file, "w"), indent=4, separators=(',', ': '))
+        with open(json_file, "w") as f:
+            json.dump(containerDefinitions, f, indent=4, separators=(',', ': '))
         
         # check exists ECS cluster
         for i in range(3):
@@ -619,14 +622,16 @@ EOF
         userdata_file = self._conf_path("userdata.%03d.sh" % (no))
         userdata_text = self._userdata()
         
-        open(userdata_file, "w").write(userdata_text)
+        with open(userdata_file, "w") as f:
+            f.write(userdata_text)
 
         log_file = self._log_path("run-instances.%03d" % (no))
 
         block_device_mappings = self._getblock_device_mappings()
         
         bd_mappings_file = self._conf_path("block_device_mappings.%03d.json" % (no))
-        json.dump(block_device_mappings, open(bd_mappings_file, "w"), indent=4, separators=(',', ': '))
+        with open(bd_mappings_file, "w") as f:
+            json.dump(block_device_mappings, f, indent=4, separators=(',', ': '))
         subnet_id = ""
         if self.task_param[no]["aws_subnet_id"] != "":
             subnet_id = "--subnet-id %s" % (self.task_param[no]["aws_subnet_id"])
@@ -885,7 +890,8 @@ EOF
         r0_cp['CreateTime'] = ecsub.tools.datetime_to_isoformat(r0['CreateTime'])
         r0_cp['Status']['UpdateTime'] = ecsub.tools.datetime_to_isoformat(r0['Status']['UpdateTime']) 
         r0_cp['ValidUntil'] = ecsub.tools.datetime_to_isoformat(r0['ValidUntil']) 
-        json.dump(response_cp, open(self._log_path("describe-spot-instance-requests.%03d" % no), "w"), indent=4, separators=(',', ': '))
+        with open(self._log_path("describe-spot-instance-requests.%03d" % no), "w") as f:
+            json.dump(response_cp, f, indent=4, separators=(',', ': '))
         
         return response['SpotInstanceRequests'][0]
     
@@ -915,7 +921,8 @@ EOF
             specification["SubnetId"] = self.task_param[no]["aws_subnet_id"]
         
         specification_file = self._conf_path("specification_file.%03d.json" % (no))
-        json.dump(specification, open(specification_file, "w"), indent=4, separators=(',', ': '))
+        with open(specification_file, "w") as f:
+            json.dump(specification, f, indent=4, separators=(',', ': '))
         
         log_file = self._log_path("request-spot-instances.%03d" % (no))
         
@@ -1093,7 +1100,8 @@ EOF
         }
 
         overrides = self._conf_path("containerOverrides.%03d.json" % (no))
-        json.dump(containerOverrides, open(overrides, "w"), indent=4, separators=(',', ': '))
+        with open(overrides, "w") as f:
+            json.dump(containerOverrides, f, indent=4, separators=(',', ': '))
 
         log_file = self._log_path("start-task.%03d" % (no))
 
@@ -1178,10 +1186,8 @@ EOF
             instanceName = instanceName
         )
         self._subprocess_call(cmd, no)
-        json.dump(
-            {"InstanceId": instance_id, "InstanceName": instanceName},
-            open(self._log_path("create-tags.%03d" % (no)), "w")
-        )
+        with open(self._log_path("create-tags.%03d" % (no)), "w") as f:
+            json.dump({"InstanceId": instance_id, "InstanceName": instanceName}, f)
         
         # set Tags to instance
         if inst_info != None:
@@ -1207,10 +1213,8 @@ EOF
             )
             self._subprocess_call(cmd, no)
 
-        json.dump(
-            {"InstanceId": instance_id, "Tags": self.tags},
-            open(self._log_path("create-extra-tags.%03d" % (no)), "w")
-        )
+        with open(self._log_path("create-extra-tags.%03d" % (no)), "w") as f:
+            json.dump({"InstanceId": instance_id, "Tags": self.tags}, f)
 
         if self.flyaway:
             return (0, None)
@@ -1258,7 +1262,8 @@ EOF
                 return '%04d/%02d/%02d %02d:%02d:%02d %s' % (o.year, o.month, o.day, o.hour, o.minute, o.second, o.tzname())
             raise TypeError(repr(o) + " is not JSON serializable")
 
-        json.dump(response, open(log_file, "w"), default=support_datetime_default, indent=4, separators=(',', ': '))
+        with open(log_file, "w") as f:
+            json.dump(response, f, default=support_datetime_default, indent=4, separators=(',', ': '))
         
         #exit_code = 1
         if "containers" in response["tasks"][0]:
@@ -1282,7 +1287,8 @@ EOF
                 ]
             )
             json_file = self._log_path("describe-spot-instance-requests.%03d" % (no))
-            json.dump(response, open(json_file, "w"), default=support_datetime_default, indent=4, separators=(',', ': '))
+            with open(json_file, "w") as f:
+                json.dump(response, f, default=support_datetime_default, indent=4, separators=(',', ': '))
             if len(response['SpotInstanceRequests']) > 0:
                 if response['SpotInstanceRequests'][0]["Status"]["Code"] == 'instance-terminated-capacity-oversubscribed':
                     exit_code = -1

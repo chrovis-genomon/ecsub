@@ -73,7 +73,8 @@ def _load_summary(params, dic_summary, header):
         
         data = None
         try:
-            data = json.load(open(dic_summary[key]))
+            with open(dic_summary[key]) as f:
+                data = json.load(f)
         except Exception as e:
             #print ("[%s] %s" % (dic_summary[key], e))
             pass

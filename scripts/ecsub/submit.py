@@ -22,9 +22,13 @@ import ecsub.metrics
 def read_tasksfile(tasks_file, cluster_name):
     
     tasks = []
+    tasks_lines = []
     header = []
 
-    for line in open(tasks_file).readlines():
+    with open(tasks_file) as f:
+        tasks_lines = f.readlines()
+
+    for line in tasks_lines:
         text = line.rstrip("\r\n")
         if len(text.rstrip()) == 0:
             continue
@@ -98,11 +102,12 @@ df -h
     option = ""
     if is_request_payer:
         option = "--request-payer requester"
-        
-    open(runsh, "w").write(run_template.format(
-        shell = shell,
-        option = option
-    ))
+
+    with open(runsh, "w") as f:
+        f.write(run_template.format(
+            shell = shell,
+            option = option
+        ))
     
 def write_s3_scripts(task_params, payer_buckets, setenv, downloader, uploader, no):
    
@@ -157,9 +162,14 @@ decrypt () {
         elif task_params["header"][i]["type"] == "output":
             up_text += cmd_template.format(option = " ".join(option), path1 = scratch_path, path2 = s3_path)
 
-    open(setenv, "w").write(sec_env_text + env_text)
-    open(downloader, "w").write(dw_text)
-    open(uploader, "w").write(up_text)
+    with open(setenv, "w") as f:
+        f.write(sec_env_text + env_text)
+
+    with open(downloader, "w") as f:
+        f.write(dw_text)
+
+    with open(uploader, "w") as f:
+        f.write(up_text)
 
 def check_bucket_location(cluster_name, task_params, work_bucket):
     
@@ -481,8 +491,11 @@ def _set_job_info(task_param, start_t, end_t, task_log, exit_code):
     
     if task_log == None:
         return info
-    
-    task = json.load(open(task_log))["tasks"][0]
+
+    task = {}
+    with open(task_log) as f:
+        task = json.load(f)["tasks"][0]
+
     info["InstanceId"] = task["instance_id"]
     info["SubnetId"] = task["subnet_id"]
     info["Memory"] = task["overrides"]["containerOverrides"][0]["memory"]
@@ -528,8 +541,9 @@ def _save_summary_file(task_summary, print_cost):
         print (ecsub.tools.info_message (task_summary["ClusterName"], task_summary["No"], message))
     
     task_summary["Price"] = "%.5f" % (total_cost)
-    log_file = "%s/log/summary.%03d.log" % (task_summary["Wdir"], task_summary["No"]) 
-    json.dump(task_summary, open(log_file, "w"), indent=4, separators=(',', ': '), sort_keys=True)
+    log_file = "%s/log/summary.%03d.log" % (task_summary["Wdir"], task_summary["No"])
+    with open(log_file, "w") as f:
+        json.dump(task_summary, f, indent=4, separators=(',', ': '), sort_keys=True)
     
 def submit_task(ctx, thread_name, aws_instance, no, task_params, spot):
     

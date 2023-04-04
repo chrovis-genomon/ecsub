@@ -21,7 +21,8 @@ def main(params):
     params["wdir"] =  "%s/%s" % (params["wdir"].rstrip("/"), params["task_name"])
     
     import json
-    summary = json.load(open(summary_list[0]))
+    with open(summary_list[0]) as f:
+        summary = json.load(f)
 
     params["cluster_name"] = summary["ClusterName"]
     
